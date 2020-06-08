@@ -278,19 +278,34 @@ for region_name in [str(es.region_name) for es in regions]:
                 ############################################
                 # get the info
                 ############################################
-                data.append({
+
+                shape = {}
+                if instance.shape_config:
+                    sc = instance.shape_config
+                    shape['ocpu'] = sc.ocpus
+                    shape['memory_gb'] = sc.memory_in_gbs
+                    shape['gpu_description'] = str(sc.gpu_description)
+                    shape['gpus'] = str(sc.gpus)
+                    shape['max_vnic_attachments'] = sc.max_vnic_attachments
+                    shape['networking_bandwidth_in_gbps'] = sc.networking_bandwidth_in_gbps
+                    shape['processor_description'] = str(sc.processor_description)
+
+                value = ({
                     'region_name': region_name,
                     'compartment_name': str(compartment.name),
                     'compartment_id': str(compartment.id),
                     'id': str(instance.id),
                     'name': str(instance.display_name),
-                    'shape': str(instance.shape),
                     'availability_domain': str(instance.availability_domain),
                     'lifecycle_state': str(instance.lifecycle_state),
                     'time_created': str(instance.time_created),
+                    'shape': str(instance.shape),
+                    'shape_config': shape,
                     'defined_tags': instance.defined_tags,
                     'freeform_tags': instance.freeform_tags
                 })
+
+                data.append(value)
                 cnt += 1
 
             # print instances for the compartment

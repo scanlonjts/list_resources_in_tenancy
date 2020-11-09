@@ -231,7 +231,7 @@ def main():
 
             # if print to screen
             if not (cmd.file or cmd.count_only):
-                print(str(f"{object_file.size:,}").rjust(18) + " - " + str(object_file.name))
+                print(str('{:20,.0f}'.format(object_file.size)).rjust(20) + " - " + str(object_file.name))
 
             # feedback if write to file or count every 100k rows
             if (cmd.file or cmd.count_only) and count % 100000 == 0:

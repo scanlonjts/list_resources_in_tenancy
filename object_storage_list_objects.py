@@ -22,7 +22,8 @@
 #   -co        - count only
 #   -f         - write to file
 #   -sb source_bucket
-#   -sp source_prefix_include
+#   -sp source_prefix
+#   -sr source_region
 ##########################################################################
 import oci
 import argparse
@@ -42,7 +43,8 @@ parser.add_argument('-ip', action='store_true', default=False, dest='is_instance
 parser.add_argument('-dt', action='store_true', default=False, dest='is_delegation_token', help='Use Delegation Token for Authentication')
 parser.add_argument('-c', type=argparse.FileType('r'), dest='config_file', help="Config File (default=~/.oci/config)")
 parser.add_argument('-sb', default="", dest='source_bucket', help='Source Bucket Name')
-parser.add_argument('-sp', default="", dest='source_prefix_include', help='Source Prefix Include')
+parser.add_argument('-sp', default="", dest='source_prefix', help='Source Prefix Include')
+parser.add_argument('-sr', default="", dest='source_region', help='Source Region')
 parser.add_argument('-f', type=argparse.FileType('w'), dest='file', help="Output to file (as csv)")
 parser.add_argument('-co', action='store_true', default=False, dest='count_only', help='Count only files and size')
 cmd = parser.parse_args()
@@ -158,11 +160,11 @@ def print_header(name):
 def print_command_info(source_namespace):
     print_header("Running List/Count Objects")
     print("Written By Adi Zohar, June 2020")
-    print("Starts at       :" + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    print("Starts at       :" + get_time(full=True))
     print("Command Line    : " + ' '.join(x for x in sys.argv[1:]))
     print("Source Namespace: " + source_namespace)
     print("Source Bucket   : " + cmd.source_bucket)
-    print("Source Prefix   : " + cmd.source_prefix_include)
+    print("Source Prefix   : " + cmd.source_prefix)
 
 
 ##############################################################################
@@ -172,10 +174,14 @@ def main():
     object_storage_client = None
     source_namespace = None
     source_bucket = cmd.source_bucket
-    source_prefix = cmd.source_prefix_include
+    source_prefix = cmd.source_prefix
 
     # get signer
     config, signer = create_signer(cmd.config_file, cmd.config_profile, cmd.is_instance_principals, cmd.is_delegation_token)
+
+    # if region is specified
+    if cmd.source_region:
+        config['region']= cmd.source_region
 
     try:
         # connect and fetch namespace
@@ -188,7 +194,10 @@ def main():
         source_namespace = object_storage_client.get_namespace().data
 
     except Exception as e:
-        raise RuntimeError("\nError extracting namespace - " + str(e))
+        print("\nError connecting to Object Storage - " + str(e))
+        raise SystemExit
+
+    print("Success.")
 
     # print information
     print_command_info(source_namespace)

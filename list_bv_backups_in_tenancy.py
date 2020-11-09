@@ -3,14 +3,14 @@
 # This software is dual-licensed to you under the Universal Permissive License (UPL) 1.0 as shown at https://oss.oracle.com/licenses/upl or Apache License 2.0 as shown at http://www.apache.org/licenses/LICENSE-2.0. You may choose either license.
 
 ##########################################################################
-# list_compute_tags_in_tenancy.py
+# list_bv_backups_in_tenancy.py
 #
 # @author: Adi Zohar
 #
 # Supports Python  3
 ##########################################################################
 # Info:
-#    List all compute tags in Tenancy
+#    List all boot volumes backups, volume backups and volume group backups in Tenancy
 #
 # Connectivity:
 #    Option 1 - User Authentication
@@ -18,13 +18,17 @@
 #       OCI user part of ListComputeTagsGroup group with below Policy rules:
 #          Allow group ListComputeTagsGroup to inspect compartments in tenancy
 #          Allow group ListComputeTagsGroup to inspect tenancies in tenancy
-#          Allow group ListComputeTagsGroup to inspect instances in tenancy
+#          Allow group ListComputeTagsGroup to inspect boot-volume-backups in tenancy
+#          Allow group ListComputeTagsGroup to inspect volume-backups in tenancy
+#          Allow group ListComputeTagsGroup to inspect volume-group-backups in tenancy
 #
 #    Option 2 - Instance Principle
 #       Compute instance part of DynListComputeTagsGroup dynamic group with policy rules:
 #          Allow dynamic group DynListComputeTagsGroup to inspect compartments in tenancy
 #          Allow dynamic group DynListComputeTagsGroup to inspect tenancies in tenancy
-#          Allow dynamic group DynListComputeTagsGroup to inspect instances in tenancy
+#          Allow dynamic group DynListComputeTagsGroup to inspect boot-volume-backups in tenancy
+#          Allow dynamic group DynListComputeTagsGroup to inspect volume-backups in tenancy
+#          Allow dynamic group DynListComputeTagsGroup to inspect volume-group-backups in tenancy
 #
 ##########################################################################
 # Modules Included:
@@ -34,7 +38,9 @@
 # - IdentityClient.list_compartments         - Policy COMPARTMENT_INSPECT
 # - IdentityClient.get_tenancy               - Policy TENANCY_INSPECT
 # - IdentityClient.list_region_subscriptions - Policy TENANCY_INSPECT
-# - ComputeClient.list_instances             - Policy
+# - block_storage.list_boot_volume_backups   - Policy boot-volume-backups
+# - block_storage.list_volume_backups        - Policy volume-backups
+# - block_storage.list_volume_group_backups  - Policy volume-group-backups
 #
 ##########################################################################
 # Application Command line parameters
@@ -192,8 +198,8 @@ cmd = parser.parse_args()
 
 # Start print time info
 start_time = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-print_header("Running List Compute Tags")
-print("Written By Adi Zohar, June 2020")
+print_header("Running List Block Storage Backups")
+print("Written By Adi Zohar, August 2020")
 print("Starts at " + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 print("Command Line : " + ' '.join(x for x in sys.argv[1:]))
 
@@ -225,6 +231,11 @@ except Exception as e:
 print("\nLoading Compute Instances...")
 data = []
 warnings = 0
+backup_faulty = 0
+num_boot_volumes_backups = 0
+num_volumes_backups = 0
+num_volumes_groups_backups = 0
+
 for region_name in [str(es.region_name) for es in regions]:
 
     print("\nRegion " + region_name + "...")
@@ -233,10 +244,10 @@ for region_name in [str(es.region_name) for es in regions]:
     config['region'] = region_name
     signer.region = region_name
 
-    # connect to virtual_network
-    compute_client = oci.core.ComputeClient(config, signer=signer)
+    # connect to BlockstorageClient
+    block_storage = oci.core.BlockstorageClient(config, signer=signer)
     if cmd.proxy:
-        compute_client.base_client.session.proxies = {'https': cmd.proxy}
+        block_storage.base_client.session.proxies = {'https': cmd.proxy}
 
     ############################################
     # Loop on all compartments
@@ -247,21 +258,22 @@ for region_name in [str(es.region_name) for es in regions]:
             # skip non active compartments
             if compartment.id != tenancy.id and compartment.lifecycle_state != oci.identity.models.Compartment.LIFECYCLE_STATE_ACTIVE:
                 continue
+            if compartment.name == "ManagedCompartmentForPaaS":
+                continue
 
             print("    Compartment " + (str(compartment.name) + "... ").ljust(35), end="")
             cnt = 0
 
             ############################################
-            # Retrieve instances
+            # Retrieve boot volume backups
             ############################################
-            instances = []
+            boot_volume_backups = []
             try:
-                instances = oci.pagination.list_call_get_all_results(
-                    compute_client.list_instances,
+                boot_volume_backups = oci.pagination.list_call_get_all_results(
+                    block_storage.list_boot_volume_backups,
                     compartment.id,
                     sort_by="DISPLAYNAME"
                 ).data
-
             except oci.exceptions.ServiceError as e:
                 if check_service_error(e.code):
                     warnings += 1
@@ -269,51 +281,165 @@ for region_name in [str(es.region_name) for es in regions]:
                     continue
                 raise
 
-            # loop on instances array
-            # instance = oci.core.models.Instance
-            for instance in instances:
-                if (instance.lifecycle_state == oci.core.models.Instance.LIFECYCLE_STATE_TERMINATED or
-                        instance.lifecycle_state == oci.core.models.Instance.LIFECYCLE_STATE_TERMINATING):
+            print(".", end="")
+
+            # loop on array
+            # arr = oci.core.models.BootVolumeBackup
+            for arr in boot_volume_backups:
+                if arr.lifecycle_state != oci.core.models.BootVolumeBackup.LIFECYCLE_STATE_AVAILABLE and arr.lifecycle_state != oci.core.models.BootVolumeBackup.LIFECYCLE_STATE_FAULTY:
                     continue
 
-                ############################################
-                # get the info
-                ############################################
+                # if fault backup
+                if arr.lifecycle_state == oci.core.models.BootVolumeBackup.LIFECYCLE_STATE_FAULTY:
+                    backup_faulty += 1
 
-                shape = {}
-                if instance.shape_config:
-                    sc = instance.shape_config
-                    shape['ocpu'] = sc.ocpus
-                    shape['memory_gb'] = sc.memory_in_gbs
-                    shape['gpu_description'] = str(sc.gpu_description)
-                    shape['gpus'] = str(sc.gpus)
-                    shape['max_vnic_attachments'] = sc.max_vnic_attachments
-                    shape['networking_bandwidth_in_gbps'] = sc.networking_bandwidth_in_gbps
-                    shape['processor_description'] = str(sc.processor_description)
-
-                value = ({
+                value = {
                     'region_name': region_name,
                     'compartment_name': str(compartment.name),
                     'compartment_id': str(compartment.id),
-                    'id': str(instance.id),
-                    'name': str(instance.display_name),
-                    'availability_domain': str(instance.availability_domain),
-                    'lifecycle_state': str(instance.lifecycle_state),
-                    'time_created': str(instance.time_created),
-                    'shape': str(instance.shape),
-                    'shape_config': shape,
-                    'defined_tags': instance.defined_tags,
-                    'freeform_tags': instance.freeform_tags
-                })
+                    'id': str(arr.id),
+                    'boot_volume_id': str(arr.boot_volume_id),
+                    'lifecycle_state': str(arr.lifecycle_state),
+                    'type': str(arr.type),
+                    'source_type': str(arr.source_type),
+                    'time_created': str(arr.time_created),
+                    'display_name': str(arr.display_name),
+                    'size_in_gbs': str(arr.size_in_gbs),
+                    'unique_size_in_gbs': str(arr.unique_size_in_gbs),
+                    'defined_tags': [] if arr.defined_tags is None else arr.defined_tags,
+                    'freeform_tags': [] if arr.freeform_tags is None else arr.freeform_tags,
+                    'backup_lifecycle_state': "",
+                    'expiration_time': "Keep" if str(arr.expiration_time) == "None" else str(arr.expiration_time)
+                }
 
                 data.append(value)
                 cnt += 1
+                num_boot_volumes_backups += 1
+
+            # print instances for the compartment
+            if cnt == 0:
+                print("(-)", end="")
+            else:
+                print("(" + str(cnt) + " Boot Volume Backups)", end="")
+
+            ############################################
+            # Retrieve block volume backups
+            ############################################
+            cnt = 0
+            block_volume_backups = []
+            try:
+                block_volume_backups = oci.pagination.list_call_get_all_results(
+                    block_storage.list_volume_backups,
+                    compartment.id,
+                    sort_by="DISPLAYNAME"
+                ).data
+            except oci.exceptions.ServiceError as e:
+                if check_service_error(e.code):
+                    warnings += 1
+                    print("Warnings ")
+                    continue
+                raise
+
+            print(" ", end="")
+
+            # loop on array
+            # arr = oci.core.models.BootVolumeBackup
+            for arr in block_volume_backups:
+                if arr.lifecycle_state != oci.core.models.VolumeBackup.LIFECYCLE_STATE_AVAILABLE and arr.lifecycle_state != oci.core.models.VolumeBackup.LIFECYCLE_STATE_FAULTY:
+                    continue
+
+                # if fault backup
+                if arr.lifecycle_state == oci.core.models.VolumeBackup.LIFECYCLE_STATE_FAULTY:
+                    backup_faulty += 1
+
+                value = {
+                    'region_name': region_name,
+                    'compartment_name': str(compartment.name),
+                    'compartment_id': str(compartment.id),
+                    'id': str(arr.id),
+                    'volume_id': str(arr.volume_id),
+                    'lifecycle_state': str(arr.lifecycle_state),
+                    'type': str(arr.type),
+                    'source_type': str(arr.source_type),
+                    'time_created': str(arr.time_created),
+                    'display_name': str(arr.display_name),
+                    'size_in_gbs': str(arr.size_in_gbs),
+                    'unique_size_in_gbs': str(arr.unique_size_in_gbs),
+                    'defined_tags': [] if arr.defined_tags is None else arr.defined_tags,
+                    'freeform_tags': [] if arr.freeform_tags is None else arr.freeform_tags,
+                    'backup_lifecycle_state': "",
+                    'expiration_time': "Keep" if str(arr.expiration_time) == "None" else str(arr.expiration_time)
+                }
+
+                data.append(value)
+                cnt += 1
+                num_volumes_backups += 1
+
+            # print instances for the compartment
+            if cnt == 0:
+                print("(-)", end="")
+            else:
+                print("(" + str(cnt) + " Block Volume Backups)", end="")
+
+            ############################################
+            # Retrieve volume group backups
+            ############################################
+            cnt = 0
+            volume_group_backups = []
+            try:
+                block_volume_backups = oci.pagination.list_call_get_all_results(
+                    block_storage.list_volume_group_backups,
+                    compartment.id,
+                    sort_by="DISPLAYNAME"
+                ).data
+            except oci.exceptions.ServiceError as e:
+                if check_service_error(e.code):
+                    warnings += 1
+                    print("Warnings ")
+                    continue
+                raise
+
+            print(" ", end="")
+
+            # loop on array
+            # arr = oci.core.models.VolumeGroupBackup
+            for arr in volume_group_backups:
+                if arr.lifecycle_state != oci.core.models.VolumeGroupBackup.LIFECYCLE_STATE_AVAILABLE and arr.lifecycle_state != oci.core.models.VolumeGroupBackup.LIFECYCLE_STATE_FAULTY:
+                    continue
+
+                # if fault backup
+                if arr.lifecycle_state == oci.core.models.VolumeGroupBackup.LIFECYCLE_STATE_FAULTY:
+                    backup_faulty += 1
+
+                value = {
+                    'region_name': region_name,
+                    'compartment_name': str(compartment.name),
+                    'compartment_id': str(compartment.id),
+                    'id': str(arr.id),
+                    'volume_group_id': str(arr.volume_group_id),
+                    'volume_backup_ids': arr.volume_backup_ids,
+                    'lifecycle_state': str(arr.lifecycle_state),
+                    'type': str(arr.type),
+                    'source_type': str(arr.source_type),
+                    'time_created': str(arr.time_created),
+                    'display_name': str(arr.display_name),
+                    'size_in_gbs': str(arr.size_in_gbs),
+                    'unique_size_in_gbs': str(arr.unique_size_in_gbs),
+                    'defined_tags': [] if arr.defined_tags is None else arr.defined_tags,
+                    'freeform_tags': [] if arr.freeform_tags is None else arr.freeform_tags,
+                    'backup_lifecycle_state': "",
+                    'expiration_time': "Keep" if str(arr.expiration_time) == "None" else str(arr.expiration_time)
+                }
+
+                data.append(value)
+                cnt += 1
+                num_volumes_groups_backups += 1
 
             # print instances for the compartment
             if cnt == 0:
                 print("(-)")
             else:
-                print("(" + str(cnt) + " Instances)")
+                print("(" + str(cnt) + " Volume Group Backups)")
 
     except Exception as e:
         raise RuntimeError("\nError extracting Instances - " + str(e))
@@ -326,4 +452,8 @@ print(json.dumps(data, indent=4, sort_keys=False))
 
 if warnings > 0:
     print_header(str(warnings) + " Warnings appeared")
+
+print_header(str(num_boot_volumes_backups) + " Boot Backups, " + str(num_volumes_backups) + " Volume Backups, " + str(num_volumes_groups_backups) + " Volume Group Backups")
+print_header(str(backup_faulty) + " faulty backups")
+
 print_header("Completed at " + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))

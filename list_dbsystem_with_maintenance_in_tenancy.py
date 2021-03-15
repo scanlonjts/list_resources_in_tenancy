@@ -10,7 +10,7 @@
 # Supports Python 3
 ##########################################################################
 # Info:
-#    List all dbsystems including maintenance in Tenancy
+#    List all dbsystems and exadatas including maintenance in Tenancy
 #
 # Connectivity:
 #    Option 1 - User Authentication
@@ -19,25 +19,27 @@
 #          Allow group ListDBSystemGroup to inspect compartments in tenancy
 #          Allow group ListDBSystemGroup to inspect tenancies in tenancy
 #          Allow group ListDBSystemGroup to inspect db-systems in tenancy
+#          Allow group ListDBSystemGroup to inspect infrastructures in tenancy
 #
 #    Option 2 - Instance Principle
 #       Compute instance part of DynListDBSystemGroup dynamic group with policy rules:
 #          Allow dynamic group DynListDBSystemGroup to inspect compartments in tenancy
 #          Allow dynamic group DynListDBSystemGroup to inspect tenancies in tenancy
 #          Allow dynamic group DynListDBSystemGroup to inspect db-systems in tenancy
+#          Allow dynamic group DynListDBSystemGroup to inspect exadata-infrastructures in tenancy
 #
 ##########################################################################
 # Modules Included:
 # - oci.identity.IdentityClient
 #
 # APIs Used:
-# - IdentityClient.list_compartments         - Policy COMPARTMENT_INSPECT
-# - IdentityClient.get_tenancy               - Policy TENANCY_INSPECT
-# - IdentityClient.list_region_subscriptions - Policy TENANCY_INSPECT
-# - DatabaseClient.list_db_systems           - Policy DB_SYSTEM_INSPECT
-# - DatabaseClient.get_maintenance_run       - Policy DB_SYSTEM_INSPECT
-# - DatabaseClient.list_cloud_exadata_infrastructures - Policy DB_SYSTEM_INSPECT
-# - DatabaseClient.list_cloud_vm_clusters    - Policy DB_SYSTEM_INSPECT
+# - IdentityClient.list_compartments                  - Policy COMPARTMENT_INSPECT
+# - IdentityClient.get_tenancy                        - Policy TENANCY_INSPECT
+# - IdentityClient.list_region_subscriptions          - Policy TENANCY_INSPECT
+# - DatabaseClient.list_db_systems                    - Policy DB_SYSTEM_INSPECT
+# - DatabaseClient.get_maintenance_run                - Policy DB_SYSTEM_INSPECT
+# - DatabaseClient.list_cloud_exadata_infrastructures - Policy EXADATA_INFRASTRUCTURES_INSPECT
+# - DatabaseClient.list_cloud_vm_clusters             - Policy EXADATA_INFRASTRUCTURES_INSPECT
 ##########################################################################
 # Application Command line parameters
 #
@@ -195,7 +197,7 @@ cmd = parser.parse_args()
 # Start print time info
 start_time = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 print_header("Running DB Systems Extract")
-print("Written By Adi Zohar, June 2020")
+print("Written By Adi Zohar, June 2020, Updated March 2021")
 print("Starts at " + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 print("Command Line : " + ' '.join(x for x in sys.argv[1:]))
 

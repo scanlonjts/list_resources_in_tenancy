@@ -11,7 +11,8 @@
 ##########################################################################
 # Application Command line parameters
 #
-#   -t config   - Config file section to use (tenancy profile)
+#   -c config   - OCI CLI Config
+#   -t profile  - profile inside the config file
 #   -p proxy    - Set Proxy (i.e. www-proxy-server.com:80)
 #   -ip         - Use Instance Principals for Authentication
 #   -dt         - Use Instance Principals with delegation token for cloud shell
@@ -96,7 +97,7 @@ def check_service_error(code):
 # Input - config_profile and is_instance_principals and is_delegation_token
 # Output - config and signer objects
 ##########################################################################
-def create_signer(config_profile, is_instance_principals, is_delegation_token):
+def create_signer(config_file, config_profile, is_instance_principals, is_delegation_token):
 
     # if instance principals authentications
     if is_instance_principals:
@@ -147,7 +148,7 @@ def create_signer(config_profile, is_instance_principals, is_delegation_token):
     # -----------------------------
     else:
         config = oci.config.from_file(
-            oci.config.DEFAULT_LOCATION,
+            (config_file if config_file else oci.config.DEFAULT_LOCATION),
             (config_profile if config_profile else oci.config.DEFAULT_PROFILE)
         )
         signer = oci.signer.Signer(
@@ -229,7 +230,8 @@ def print_limits(limits_data):
 
 # Get Command Line Parser
 parser = argparse.ArgumentParser()
-parser.add_argument('-t', default="", dest='config_profile', help='Config file section to use (tenancy profile)')
+parser.add_argument('-c', default="", dest='config_file', help='OCI CLI Config file')
+parser.add_argument('-t', default="", dest='config_profile', help='Config Profile inside the config file')
 parser.add_argument('-p', default="", dest='proxy', help='Set Proxy (i.e. www-proxy-server.com:80) ')
 parser.add_argument('-rg', default="", dest='filter_region', help='filter by region (i.e. us-ashburn-1) ')
 parser.add_argument('-cp', default="", dest='filter_comp', help='filter by compartment (i.e. production) ')
@@ -253,7 +255,7 @@ print("Written By Adi Zohar, Sep 2021")
 print("Command Line : " + ' '.join(x for x in sys.argv[1:]))
 
 # Identity extract compartments
-config, signer = create_signer(cmd.config_profile, cmd.is_instance_principals, cmd.is_delegation_token)
+config, signer = create_signer(cmd.config_file, cmd.config_profile, cmd.is_instance_principals, cmd.is_delegation_token)
 compartments = []
 tenancy = None
 filter_region = cmd.filter_region

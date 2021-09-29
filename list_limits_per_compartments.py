@@ -20,6 +20,7 @@
 #   -cp compart - Filter by Comcpartment
 #   -sr service - Filter by Service
 #   -js         - print in JSON format
+#   -csv file   - print to csv file
 #
 ##########################################################################
 # Info:
@@ -64,6 +65,7 @@ import oci
 import json
 import os
 import time
+import csv
 
 
 ##########################################################################
@@ -213,7 +215,7 @@ def print_limits(limits_data):
                 if not prev_compartment or prev_compartment != compartment_name:
                     print_header(compartment_name, 2)
 
-                print(str(ct['name'] + " ").ljust(20) + limit_name + value + used + available + scope)
+                print(str(ct['service_name'] + " ").ljust(20) + limit_name + value + used + available + scope)
                 prev_compartment = compartment_name
 
             print("")
@@ -223,6 +225,58 @@ def print_limits(limits_data):
     except Exception as e:
         raise RuntimeError("Error in print_limits: " + str(e.args))
 
+
+##########################################################################
+# create csv file
+##########################################################################
+def export_to_csv_file(file_name, limits_data):
+
+    csv_data = []
+
+    try:
+        for region in limits_data:
+            reg_name = region['region_name']
+            limits = region['data']
+            sorted_limit = sorted(limits, key=lambda i: i['compartment_name'])
+
+            for ct in sorted_limit:
+                val = {
+                    'region_name': reg_name,
+                    'compartment_name': ct['compartment_name'],
+                    'compartment_id': ct['compartment_id'],
+                    'service_name': ct['service_name'],
+                    'service_description': ct['service_description'],
+                    'limit_name': ct['limit_name'],
+                    'value': ct['value'],
+                    'used': ct['used'],
+                    'available': ct['available'],
+                    'scope': ct['scope_type'],
+                    'availability_domain': ct['availability_domain']
+                }
+                csv_data.append(val)
+
+        # if no data
+        if len(csv_data) == 0:
+            return
+
+        # prepare keys and data
+        result = [dict(item) for item in csv_data]
+        fields = [key for key in result[0].keys()]
+
+        with open(file_name, mode='w', newline='') as csv_file:
+            writer = csv.DictWriter(csv_file, fieldnames=fields)
+
+            # write header
+            writer.writeheader()
+
+            for row in result:
+                writer.writerow(row)
+
+        print("")
+        print("Extracted to CSV file : --> " + file_name)
+
+    except Exception as e:
+        raise Exception("Error in export_to_csv_file: " + str(e.args))
 
 ##########################################################################
 # Main
@@ -239,6 +293,7 @@ parser.add_argument('-sr', default="", dest='filter_service', help='filter by se
 parser.add_argument('-ip', action='store_true', default=False, dest='is_instance_principals', help='Use Instance Principals for Authentication')
 parser.add_argument('-dt', action='store_true', default=False, dest='is_delegation_token', help='Use Delegation Token for Authentication')
 parser.add_argument('-js', action='store_true', default=False, dest='print_json', help='print in JSON format')
+parser.add_argument('-csv', default="", dest='csv', help="Output to CSV files, Input as file header")
 cmd = parser.parse_args()
 
 # Start print time info
@@ -376,8 +431,8 @@ for region_name in [str(es.region_name) for es in regions]:
                     val = {
                         'compartment_name': str(compartment.name),
                         'compartment_id': str(compartment.id),
-                        'name': str(service.name),
-                        'description': str(service.description),
+                        'service_name': str(service.name),
+                        'service_description': str(service.description),
                         'limit_name': str(limit.name),
                         'availability_domain': ("" if limit.availability_domain is None else str(limit.availability_domain)),
                         'scope_type': str(limit.scope_type),
@@ -430,8 +485,9 @@ for region_name in [str(es.region_name) for es in regions]:
 ############################################
 # Print Output
 ############################################
-# to print JSON
-if print_json:
+if cmd.csv:
+    export_to_csv_file(cmd.csv, main_data)
+elif print_json:
     print(json.dumps(main_data, indent=4, sort_keys=False))
 else:
     print_limits(main_data)

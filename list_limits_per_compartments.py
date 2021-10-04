@@ -19,6 +19,7 @@
 #   -rg region  - Filter Region
 #   -cp compart - Filter by Comcpartment
 #   -sr service - Filter by Service
+#   -sc scope   - Filter by Scope = AD,REGION
 #   -js         - print in JSON format
 #   -csv file   - print to csv file
 #
@@ -278,10 +279,10 @@ def export_to_csv_file(file_name, limits_data):
     except Exception as e:
         raise Exception("Error in export_to_csv_file: " + str(e.args))
 
+
 ##########################################################################
 # Main
 ##########################################################################
-
 # Get Command Line Parser
 parser = argparse.ArgumentParser()
 parser.add_argument('-c', default="", dest='config_file', help='OCI CLI Config file')
@@ -289,7 +290,8 @@ parser.add_argument('-t', default="", dest='config_profile', help='Config Profil
 parser.add_argument('-p', default="", dest='proxy', help='Set Proxy (i.e. www-proxy-server.com:80) ')
 parser.add_argument('-rg', default="", dest='filter_region', help='filter by region (i.e. us-ashburn-1) ')
 parser.add_argument('-cp', default="", dest='filter_comp', help='filter by compartment (i.e. production) ')
-parser.add_argument('-sr', default="", dest='filter_service', help='filter by servoce (i.e. compute) ')
+parser.add_argument('-sr', default="", dest='filter_service', help='filter by service (i.e. compute) ')
+parser.add_argument('-sc', default="", dest='filter_scope', help='filter by scope (i.e. AD,REGION,GLOBAL) ')
 parser.add_argument('-ip', action='store_true', default=False, dest='is_instance_principals', help='Use Instance Principals for Authentication')
 parser.add_argument('-dt', action='store_true', default=False, dest='is_delegation_token', help='Use Delegation Token for Authentication')
 parser.add_argument('-js', action='store_true', default=False, dest='print_json', help='print in JSON format')
@@ -316,6 +318,7 @@ tenancy = None
 filter_region = cmd.filter_region
 filter_compartment = cmd.filter_comp
 filter_service = cmd.filter_service
+filter_scope = cmd.filter_scope
 print_json = cmd.print_json
 
 try:
@@ -428,6 +431,9 @@ for region_name in [str(es.region_name) for es in regions]:
 
                 # oci.limits.models.LimitValueSummary
                 for limit in limits:
+                    if filter_scope and str(filter_scope) not in str(limit.scope_type):
+                        continue
+
                     val = {
                         'compartment_name': str(compartment.name),
                         'compartment_id': str(compartment.id),

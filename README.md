@@ -130,8 +130,8 @@ Produce list of policies per compartment, can be extracted to screen or CSV.
 ```
 usage: list_policies_in_tenancy.py [-h] [-c CONFIG_FILE] [-t CONFIG_PROFILE]
                                    [-p PROXY] [-cp FILTER_COMPN]
-                                   [-cr FILTER_COMPR] [-g FILTER_GROUP] [-ip]
-                                   [-dt] [-json] [-csv CSV]
+                                   [-cr FILTER_COMPR] [-g FILTER_GROUP] [-ia]
+                                   [-ip] [-dt] [-json] [-csv CSV]
 
 optional arguments:
   -h, --help         show this help message and exit
@@ -140,11 +140,11 @@ optional arguments:
   -p PROXY           Set Proxy (i.e. www-proxy-server.com:80)
   -cp FILTER_COMPN   filter by compartment Name or Id
   -cr FILTER_COMPR   filter by compartment Path
-  -g FILTER_GROUP    filter by IAM Group
+  -g FILTER_GROUP    filter by IAM Group or Dynamic Group
+  -ia                Do not include Any-User when filterring groups
+                     [Default=False]
   -ip                Use Instance Principals for Authentication
   -dt                Use Delegation Token for Authentication
   -json              Output to JSON
-  -csv CSV           Output to CSV files, Input as file header
-
-Process finished with exit code 0
+  -csv CSV           Output to CSV files, Input as file header```
 ```

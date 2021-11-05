@@ -21,6 +21,7 @@
 #   -cp compart - Filter by Comcpartment
 #   -cr compart - Filter by Comcpartment Path
 #   -g group    - Filter by Group
+#   -ia         - Ignore Any-User when filterring groups [Default=False]
 #   -csv file   - print to csv file
 #
 ##########################################################################
@@ -259,6 +260,32 @@ def identity_read_compartments(identity, tenancy, filter_by_compartment_name, fi
 
 
 ##########################################################################
+# Check if group in statement
+##########################################################################
+def check_group_in_statement(statement, group, not_include_anyuser):
+    try:
+        # split statement words
+        array = str(statement).lower().replace(" ,", ",").replace(", ", ",").replace(" id ", "").split(" ")
+        if len(array) < 4:
+            return False
+
+        # if anyuser - return true
+        if not not_include_anyuser and (array[1] == "any-user" or array[1] == "anyuser"):
+            return True
+
+        # if group or dynamic group
+        if array[1] == "group" or array[2] == "dynamic-group":
+            for sgroup in array[2].split(","):
+                if str(group).lower() == sgroup:
+                    return True
+
+        return False
+
+    except Exception as e:
+        raise RuntimeError("Error in check_group_in_statement: " + str(e.args))
+
+
+##########################################################################
 # Print Limit
 ##########################################################################
 def print_policies(main_data):
@@ -343,7 +370,8 @@ parser.add_argument('-t', default="", dest='config_profile', help='Config Profil
 parser.add_argument('-p', default="", dest='proxy', help='Set Proxy (i.e. www-proxy-server.com:80) ')
 parser.add_argument('-cp', default="", dest='filter_compn', help='filter by compartment Name or Id')
 parser.add_argument('-cr', default="", dest='filter_compr', help='filter by compartment Path')
-parser.add_argument('-g', default="", dest='filter_group', help='filter by IAM Group')
+parser.add_argument('-g', default="", dest='filter_group', help='filter by IAM Group or Dynamic Group')
+parser.add_argument('-ia', action='store_true', default=False, dest='not_include_anyuser', help='Do not include Any-User when filterring groups [Default=False]')
 parser.add_argument('-ip', action='store_true', default=False, dest='is_instance_principals', help='Use Instance Principals for Authentication')
 parser.add_argument('-dt', action='store_true', default=False, dest='is_delegation_token', help='Use Delegation Token for Authentication')
 parser.add_argument('-json', action='store_true', default=False, dest='print_json', help='Output to JSON')
@@ -367,6 +395,7 @@ filter_compartment_name = cmd.filter_compn
 filter_compartment_path = cmd.filter_compr
 print_json = cmd.print_json
 filter_group = cmd.filter_group
+not_include_anyuser = cmd.not_include_anyuser
 
 try:
     print("\nConnecting to Identity Service...")
@@ -412,7 +441,7 @@ for compartment in compartments:
 
                 # loop on statements
                 for statement in policy.statements:
-                    if filter_group and not (" " + str(filter_group).lower() + " " in str(statement).lower() or "anyuser" in str(statement).lower() or "anygroup" in str(statement).lower()):
+                    if filter_group and not check_group_in_statement(statement, filter_group, not_include_anyuser):
                         continue
                     data_statements.append(str(statement))
 

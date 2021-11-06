@@ -148,3 +148,8 @@ optional arguments:
   -json              Output to JSON
   -csv CSV           Output to CSV files, Input as file header```
 ```
+## list_all_capres.py
+(only tested in remote mode)
+Produce list of all Capacity Reservations in the tenancy. Identifies by Region and Compartment. Very useful for tracking down errant spend.
+
+usage: list_all_capres.py -t PROFILE
